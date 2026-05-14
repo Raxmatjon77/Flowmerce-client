@@ -1,6 +1,6 @@
 import { getStoredToken, TOKEN_KEY } from './auth';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
 
 function buildUrl(path: string, params?: Record<string, string | number | boolean | undefined>) {
   const url = new URL(`${API_BASE_URL}${path}`);
@@ -46,7 +46,16 @@ export async function apiRequest<T>(
     }
 
     const text = await response.text();
-    throw new Error(text || `Request failed with status ${response.status}`);
+    let userMessage = `Request failed with status ${response.status}`;
+    try {
+      const json = JSON.parse(text) as { message?: string | string[] };
+      if (json.message) {
+        userMessage = Array.isArray(json.message) ? json.message.join('; ') : json.message;
+      }
+    } catch {
+      if (text) userMessage = text;
+    }
+    throw new Error(userMessage);
   }
 
   return response.json() as Promise<T>;

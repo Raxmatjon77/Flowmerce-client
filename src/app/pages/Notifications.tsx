@@ -4,7 +4,6 @@ import { StatusBadge } from '../components/StatusBadge';
 import { Badge } from '../components/ui/badge';
 import { EmptyState, ErrorState, LoadingState } from '../components/AsyncState';
 import { customerApi } from '../../lib/customer-api';
-import { getStoredUserId } from '../../lib/auth';
 import { useApiData } from '../../lib/use-api';
 
 function formatDateTime(value: string) {
@@ -18,11 +17,9 @@ const CHANNEL_COLORS: Record<string, string> = {
 };
 
 export function Notifications() {
-  const recipientId = getStoredUserId() ?? '';
-
   const { data, loading, error, reload } = useApiData(
-    () => customerApi.listNotifications(recipientId),
-    [recipientId],
+    () => customerApi.listNotifications(),
+    [],
   );
 
   const notifications = data?.data ?? [];

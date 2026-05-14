@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useParams } from 'react-router';
 import { ArrowLeft, CreditCard, Package, Truck } from 'lucide-react';
 import { toast } from 'sonner';
@@ -6,7 +6,7 @@ import { Card } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { StatusBadge } from '../components/StatusBadge';
 import { ErrorState, LoadingState } from '../components/AsyncState';
-import { customerApi } from '../../lib/customer-api';
+import { customerApi, subscribeToOrderEvents } from '../../lib/customer-api';
 import { useApiData } from '../../lib/use-api';
 import { OrderStatus } from '../../lib/constants';
 
@@ -27,6 +27,23 @@ export function OrderDetail() {
     () => customerApi.getOrder(id!),
     [id],
   );
+
+  useEffect(() => {
+    if (!id || !order) return;
+    if (order.status === OrderStatus.DELIVERED || order.status === OrderStatus.CANCELLED) return;
+
+    const es = subscribeToOrderEvents(
+      id,
+      (event) => {
+        toast.info(`Order status updated: ${event.status}`);
+        reload();
+      },
+    );
+
+    return () => {
+      es.close();
+    };
+  }, [id, order?.status]);
 
   async function handleCancel() {
     if (!id) return;

@@ -1,6 +1,13 @@
-import { apiGet, apiPost } from './api';
+import { apiGet, apiPost, API_BASE_URL } from './api';
+import { getStoredToken } from './auth';
+import type { components } from '../types/api.generated';
 
-// --- Types ---
+// --- Generated types (exact match with backend schema) ---
+export type OrderItem = components['schemas']['OrderItemResponseDto'];
+export type InventoryItem = components['schemas']['InventoryResponseDto'];
+export type NotificationItem = components['schemas']['NotificationResponseDto'];
+
+// --- Hand-written types (backend returns richer shapes not captured in DTOs) ---
 export interface OrderListItem {
   id: string;
   customerId: string;
@@ -10,16 +17,6 @@ export interface OrderListItem {
   itemCount: number;
   shippingAddress: string;
   createdAt: string;
-}
-
-export interface OrderItem {
-  id: string;
-  productId: string;
-  productName: string;
-  quantity: number;
-  unitPrice: number;
-  currency: string;
-  totalPrice: number;
 }
 
 export interface PaymentRef {
@@ -48,28 +45,7 @@ export interface OrderDetail extends OrderListItem {
   shipment: ShipmentRef | null;
 }
 
-export interface InventoryItem {
-  id: string;
-  sku: string;
-  productName: string;
-  totalQuantity: number;
-  reservedQuantity: number;
-  availableQuantity: number;
-  unitPrice: number; // cents
-}
-
-export interface NotificationItem {
-  id: string;
-  recipientId: string;
-  channel: string;
-  type: string;
-  status: string;
-  subject: string;
-  body: string;
-  failureReason: string | null;
-  createdAt: string;
-}
-
+// --- Frontend-only types ---
 export interface PaginatedResponse<T> {
   data: T[];
   meta: { total: number; limit: number };
@@ -111,8 +87,8 @@ export const customerApi = {
   listInventory: (params?: Record<string, string | number | undefined>) =>
     apiGet<PaginatedResponse<InventoryItem>>('/api/v1/inventory', params as Record<string, string | number | boolean | undefined>),
 
-  listNotifications: (recipientId: string) =>
-    apiGet<PaginatedResponse<NotificationItem>>('/api/v1/notifications', { recipientId }),
+  listNotifications: () =>
+    apiGet<PaginatedResponse<NotificationItem>>('/api/v1/notifications'),
 };
 
 // Cart helpers (localStorage)
@@ -154,4 +130,34 @@ export function clearCart(): void {
 
 export function formatPrice(cents: number, currency = 'USD'): string {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(cents / 100);
+}
+
+export interface OrderStatusEventPayload {
+  orderId: string;
+  status: string;
+  updatedAt: string;
+}
+
+export function subscribeToOrderEvents(
+  orderId: string,
+  onStatusUpdate: (event: OrderStatusEventPayload) => void,
+  onError?: (err: Event) => void,
+): EventSource {
+  const token = getStoredToken() ?? '';
+  const url = `${API_BASE_URL}/api/v1/orders/${orderId}/events?token=${encodeURIComponent(token)}`;
+  const es = new EventSource(url);
+
+  es.addEventListener('order.status.updated', (e: MessageEvent) => {
+    try {
+      onStatusUpdate(JSON.parse(e.data as string) as OrderStatusEventPayload);
+    } catch {
+      // malformed event — ignore
+    }
+  });
+
+  if (onError) {
+    es.onerror = onError;
+  }
+
+  return es;
 }
