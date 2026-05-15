@@ -1,5 +1,6 @@
 import { ReactNode, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router';
+import { ErrorBoundary } from './ErrorBoundary';
 import { logout, getStoredUserId } from '../../lib/auth';
 import { getCart } from '../../lib/customer-api';
 import {
@@ -197,7 +198,9 @@ export function CustomerLayout({ children }: CustomerLayoutProps) {
 
         {/* Page Content */}
         <main className="p-4 sm:p-6 lg:p-8">
-          {children}
+          <ErrorBoundary>
+            {children}
+          </ErrorBoundary>
         </main>
       </div>
 

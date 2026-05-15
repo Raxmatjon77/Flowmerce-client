@@ -6,7 +6,10 @@
   "scripts": {
     "build": "vite build",
     "dev": "vite",
-    "generate:types": "openapi-typescript http://localhost:3000/api/docs-json -o src/types/api.generated.ts"
+    "generate:types": "openapi-typescript http://localhost:3000/api/docs-json -o src/types/api.generated.ts",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:report": "playwright show-report"
   },
   "dependencies": {
     "@emotion/react": "11.14.0",
@@ -68,6 +71,7 @@
     "vaul": "1.1.2"
   },
   "devDependencies": {
+    "@playwright/test": "^1.60.0",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "4.7.0",
