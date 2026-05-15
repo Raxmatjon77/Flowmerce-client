@@ -1,4 +1,4 @@
-import { apiGet, apiPost, API_BASE_URL } from './api';
+import { apiGet, apiPost, apiDelete, API_BASE_URL } from './api';
 import { getStoredToken } from './auth';
 import type { components } from '../types/api.generated';
 
@@ -115,17 +115,84 @@ export function addToCart(item: CartItem): CartItem[] {
     cart.push(item);
   }
   saveCart(cart);
+  void syncCartToServer(cart);
   return cart;
 }
 
 export function removeFromCart(inventoryItemId: string): CartItem[] {
   const cart = getCart().filter((c) => c.inventoryItemId !== inventoryItemId);
   saveCart(cart);
+  void syncCartToServer(cart);
   return cart;
 }
 
 export function clearCart(): void {
   localStorage.removeItem(CART_KEY);
+}
+
+// --- Server-side cart sync ---
+
+interface ServerCartItemShape {
+  inventoryItemId: string;
+  sku: string;
+  productName: string;
+  quantity: number;
+  unitPrice: number;
+}
+
+export async function fetchServerCart(): Promise<CartItem[]> {
+  try {
+    const result = await apiGet<{ items: ServerCartItemShape[] }>('/api/v1/cart');
+    return result.items.map((i) => ({
+      inventoryItemId: i.inventoryItemId,
+      sku: i.sku,
+      productName: i.productName,
+      quantity: i.quantity,
+      unitPrice: i.unitPrice,
+    }));
+  } catch {
+    // Server cart fetch failure is non-fatal — return empty
+    return [];
+  }
+}
+
+export async function syncCartToServer(items: CartItem[]): Promise<void> {
+  try {
+    await apiPost<void>('/api/v1/cart/sync', {
+      items: items.map((i) => ({
+        inventoryItemId: i.inventoryItemId,
+        sku: i.sku,
+        productName: i.productName,
+        quantity: i.quantity,
+        unitPrice: i.unitPrice,
+      })),
+    });
+  } catch {
+    // Sync failure is non-fatal — localStorage remains the source of truth
+  }
+}
+
+export async function clearServerCart(): Promise<void> {
+  try {
+    await apiDelete('/api/v1/cart');
+  } catch {
+    // Non-fatal
+  }
+}
+
+/**
+ * Merge server and local carts. Local item quantities win for duplicates
+ * (local cart reflects the most recent user intent on this device).
+ */
+export function mergeCart(server: CartItem[], local: CartItem[]): CartItem[] {
+  const merged = new Map<string, CartItem>();
+  for (const item of server) {
+    merged.set(item.inventoryItemId, item);
+  }
+  for (const item of local) {
+    merged.set(item.inventoryItemId, item); // local overwrites server for same SKU
+  }
+  return Array.from(merged.values());
 }
 
 export function formatPrice(cents: number, currency = 'USD'): string {

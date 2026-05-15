@@ -1,3 +1,11 @@
+import {
+  fetchServerCart,
+  mergeCart,
+  saveCart,
+  getCart,
+  clearServerCart,
+} from './customer-api';
+
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
 export const TOKEN_KEY = 'flowmerce.customer.token';
 
@@ -29,6 +37,14 @@ export async function login(userId: string, password: string): Promise<string> {
   if (!response.ok) throw new Error('Invalid credentials. Please try again.');
   const data = (await response.json()) as { accessToken: string };
   localStorage.setItem(TOKEN_KEY, data.accessToken);
+
+  // Merge server cart with any cart already in localStorage on this device.
+  // Local quantities win for duplicate SKUs so the user's pending selections are preserved.
+  const serverCart = await fetchServerCart();
+  const localCart = getCart();
+  const merged = mergeCart(serverCart, localCart);
+  saveCart(merged);
+
   return data.accessToken;
 }
 
@@ -47,7 +63,10 @@ export async function register(payload: { userId: string; email: string; name: s
   return data.accessToken;
 }
 
-export function logout(): void {
+export async function logout(): Promise<void> {
+  // Best-effort: clear the server cart before wiping the token so the
+  // DELETE request can still be authenticated.
+  await clearServerCart();
   localStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem('flowmerce.cart');
   window.location.replace('/login');

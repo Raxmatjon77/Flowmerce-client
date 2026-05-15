@@ -11,6 +11,7 @@ import {
   getCart,
   removeFromCart,
   clearCart,
+  clearServerCart,
   formatPrice,
   CartItem,
 } from '../../lib/customer-api';
@@ -68,6 +69,7 @@ export function Checkout() {
         shippingAddress: { street, city, state, zipCode, country },
       });
       clearCart();
+      void clearServerCart();
       setCart([]);
       setConfirmedOrderId(order.id);
       setStep('confirmed');

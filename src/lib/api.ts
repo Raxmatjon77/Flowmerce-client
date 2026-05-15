@@ -87,3 +87,7 @@ export function apiPatch<T>(
     body: body ? JSON.stringify(body) : undefined,
   });
 }
+
+export function apiDelete(path: string): Promise<void> {
+  return apiRequest<void>(path, { method: 'DELETE' });
+}
