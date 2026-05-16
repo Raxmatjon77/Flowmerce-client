@@ -1,6 +1,9 @@
 import { apiGet, apiPost, apiDelete, API_BASE_URL } from './api';
 import { getStoredToken } from './auth';
 import type { components } from '../types/api.generated';
+import type { ConversationDto, MessageDto, AttachmentDto } from '../types/support';
+
+export type { ConversationDto, MessageDto, AttachmentDto };
 
 // --- Generated types (exact match with backend schema) ---
 export type OrderItem = components['schemas']['OrderItemResponseDto'];
@@ -197,6 +200,83 @@ export function mergeCart(server: CartItem[], local: CartItem[]): CartItem[] {
 
 export function formatPrice(cents: number, currency = 'USD'): string {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(cents / 100);
+}
+
+// --- Support / Chat API ---
+
+export async function createConversation(subject: string): Promise<ConversationDto> {
+  return apiPost<ConversationDto>('/api/v1/support/conversations', { subject });
+}
+
+export async function getConversations(): Promise<ConversationDto[]> {
+  return apiGet<ConversationDto[]>('/api/v1/support/conversations');
+}
+
+export async function getConversation(id: string): Promise<ConversationDto> {
+  return apiGet<ConversationDto>(`/api/v1/support/conversations/${id}`);
+}
+
+export async function getMessages(conversationId: string): Promise<MessageDto[]> {
+  return apiGet<MessageDto[]>(`/api/v1/support/conversations/${conversationId}/messages`);
+}
+
+export async function rateConversation(
+  conversationId: string,
+  stars: number,
+  comment: string,
+): Promise<void> {
+  await apiPost<void>(`/api/v1/support/conversations/${conversationId}/rating`, {
+    stars,
+    comment,
+  });
+}
+
+export async function uploadAttachment(
+  messageId: string,
+  file: File,
+): Promise<AttachmentDto> {
+  const token = getStoredToken();
+  if (!token) {
+    window.location.replace('/login');
+    throw new Error('Not authenticated');
+  }
+
+  const formData = new FormData();
+  formData.append('file', file);
+
+  const response = await fetch(
+    `${API_BASE_URL}/api/v1/support/messages/${messageId}/attachments`,
+    {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+      body: formData,
+    },
+  );
+
+  if (!response.ok) {
+    const text = await response.text();
+    let userMessage = `Upload failed with status ${response.status}`;
+    try {
+      const json = JSON.parse(text) as { message?: string | string[] };
+      if (json.message) {
+        userMessage = Array.isArray(json.message) ? json.message.join('; ') : json.message;
+      }
+    } catch {
+      if (text) userMessage = text;
+    }
+    throw new Error(userMessage);
+  }
+
+  return response.json() as Promise<AttachmentDto>;
+}
+
+export async function sendMessage(
+  conversationId: string,
+  content: string,
+): Promise<MessageDto> {
+  return apiPost<MessageDto>(`/api/v1/support/conversations/${conversationId}/messages`, {
+    content,
+  });
 }
 
 export interface OrderStatusEventPayload {

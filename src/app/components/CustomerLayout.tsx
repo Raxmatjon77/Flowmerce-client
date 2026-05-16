@@ -7,6 +7,7 @@ import {
   ShoppingCart,
   Package,
   Bell,
+  MessageCircle,
   Menu,
   X,
   ChevronRight,
@@ -32,6 +33,7 @@ const navigation = [
   { name: 'My Orders', href: '/', icon: ShoppingCart },
   { name: 'Shop', href: '/shop', icon: Package },
   { name: 'Notifications', href: '/notifications', icon: Bell },
+  { name: 'Support', href: '/support', icon: MessageCircle },
 ];
 
 export function CustomerLayout({ children }: CustomerLayoutProps) {

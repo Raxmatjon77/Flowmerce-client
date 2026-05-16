@@ -10,6 +10,8 @@ import { OrderDetail } from './pages/OrderDetail';
 import { Shop } from './pages/Shop';
 import { Checkout } from './pages/Checkout';
 import { Notifications } from './pages/Notifications';
+import { Support } from './pages/Support';
+import { SupportThread } from './pages/SupportThread';
 import { NotFound } from './pages/NotFound';
 
 function Protected({ children }: { children: React.ReactNode }) {
@@ -59,6 +61,16 @@ export const router = createBrowserRouter([
   {
     path: '/notifications',
     element: <Protected><Notifications /></Protected>,
+    errorElement: <RouteErrorFallback />,
+  },
+  {
+    path: '/support',
+    element: <Protected><Support /></Protected>,
+    errorElement: <RouteErrorFallback />,
+  },
+  {
+    path: '/support/:id',
+    element: <Protected><SupportThread /></Protected>,
     errorElement: <RouteErrorFallback />,
   },
   {
