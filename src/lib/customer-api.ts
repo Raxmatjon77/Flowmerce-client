@@ -2,6 +2,7 @@ import { apiGet, apiPost, apiDelete, API_BASE_URL } from './api';
 import { getStoredToken } from './auth';
 import type { components } from '../types/api.generated';
 import type { ConversationDto, MessageDto, AttachmentDto } from '../types/support';
+import type { CouponValidationDto } from '../types/coupon';
 
 export type { ConversationDto, MessageDto, AttachmentDto };
 
@@ -85,6 +86,7 @@ export const customerApi = {
     customerId: string;
     items: Array<{ productId: string; productName: string; quantity: number; unitPrice: number; currency: string }>;
     shippingAddress: ShippingAddress;
+    couponCode?: string | null;
   }) => apiPost<OrderDetail>('/api/v1/orders', payload),
 
   listInventory: (params?: Record<string, string | number | undefined>) =>
@@ -225,14 +227,14 @@ export async function rateConversation(
   stars: number,
   comment: string,
 ): Promise<void> {
-  await apiPost<void>(`/api/v1/support/conversations/${conversationId}/rating`, {
+  await apiPost<void>(`/api/v1/support/conversations/${conversationId}/rate`, {
     stars,
     comment,
   });
 }
 
 export async function uploadAttachment(
-  messageId: string,
+  conversationId: string,
   file: File,
 ): Promise<AttachmentDto> {
   const token = getStoredToken();
@@ -245,7 +247,7 @@ export async function uploadAttachment(
   formData.append('file', file);
 
   const response = await fetch(
-    `${API_BASE_URL}/api/v1/support/messages/${messageId}/attachments`,
+    `${API_BASE_URL}/api/v1/support/conversations/${conversationId}/attachments`,
     {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}` },
@@ -277,6 +279,19 @@ export async function sendMessage(
   return apiPost<MessageDto>(`/api/v1/support/conversations/${conversationId}/messages`, {
     content,
   });
+}
+
+// --- Coupon ---
+
+export type { CouponValidationDto };
+
+export async function validateCoupon(
+  code: string,
+  orderAmount: number,
+): Promise<CouponValidationDto> {
+  return apiGet<CouponValidationDto>(
+    `/api/v1/coupons/validate?code=${encodeURIComponent(code)}&orderAmount=${orderAmount}`,
+  );
 }
 
 export interface OrderStatusEventPayload {

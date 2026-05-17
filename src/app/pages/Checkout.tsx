@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router';
-import { Trash2, ArrowRight, CheckCircle } from 'lucide-react';
+import { Trash2, ArrowRight, CheckCircle, Tag, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { Card } from '../components/ui/card';
 import { Button } from '../components/ui/button';
@@ -13,8 +13,10 @@ import {
   clearCart,
   clearServerCart,
   formatPrice,
+  validateCoupon,
   CartItem,
 } from '../../lib/customer-api';
+import type { CouponValidationDto } from '../../types/coupon';
 import { getStoredUserId } from '../../lib/auth';
 
 type Step = 1 | 2 | 'confirmed';
@@ -34,11 +36,45 @@ export function Checkout() {
   const [zipCode, setZipCode] = useState('');
   const [country, setCountry] = useState('');
 
+  // Coupon state
+  const [couponInput, setCouponInput] = useState('');
+  const [appliedCoupon, setAppliedCoupon] = useState<CouponValidationDto | null>(null);
+  const [couponLoading, setCouponLoading] = useState(false);
+  const [couponError, setCouponError] = useState<string | null>(null);
+
   const subtotal = cart.reduce((sum, c) => sum + c.unitPrice * c.quantity, 0);
+  const discountAmount = appliedCoupon?.discountAmount ?? 0;
+  const total = subtotal - discountAmount;
 
   function handleRemove(inventoryItemId: string) {
     const updated = removeFromCart(inventoryItemId);
     setCart(updated);
+    // Reset coupon when cart changes (total changes)
+    setAppliedCoupon(null);
+    setCouponError(null);
+  }
+
+  async function handleApplyCoupon() {
+    const code = couponInput.trim();
+    if (!code) return;
+    setCouponLoading(true);
+    setCouponError(null);
+    try {
+      const result = await validateCoupon(code, subtotal);
+      setAppliedCoupon(result);
+      toast.success(`Coupon "${result.couponCode}" applied — saving ${formatPrice(result.discountAmount)}!`);
+    } catch (err) {
+      setCouponError(err instanceof Error ? err.message : 'Invalid coupon code.');
+      setAppliedCoupon(null);
+    } finally {
+      setCouponLoading(false);
+    }
+  }
+
+  function handleRemoveCoupon() {
+    setAppliedCoupon(null);
+    setCouponInput('');
+    setCouponError(null);
   }
 
   async function handlePlaceOrder() {
@@ -67,6 +103,7 @@ export function Checkout() {
           currency: 'USD',
         })),
         shippingAddress: { street, city, state, zipCode, country },
+        couponCode: appliedCoupon?.couponCode ?? null,
       });
       clearCart();
       void clearServerCart();
@@ -162,10 +199,60 @@ export function Checkout() {
                 </div>
               </Card>
 
-              <Card className="border-white/10 bg-gradient-to-br from-purple-500/10 to-blue-500/10 p-4">
+              {/* Coupon input */}
+              <Card className="border-white/10 bg-slate-900/50 p-4 backdrop-blur-sm">
+                <div className="flex items-center gap-2 mb-2">
+                  <Tag className="h-4 w-4 text-purple-400" />
+                  <span className="text-sm font-medium text-white">Coupon Code</span>
+                </div>
+                {appliedCoupon ? (
+                  <div className="flex items-center justify-between rounded-lg border border-green-500/30 bg-green-500/10 px-3 py-2">
+                    <span className="text-sm text-green-400 font-medium">
+                      ✅ {appliedCoupon.couponCode} — −{formatPrice(appliedCoupon.discountAmount)} applied
+                    </span>
+                    <button onClick={handleRemoveCoupon} className="text-gray-400 hover:text-white ml-2">
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex gap-2">
+                    <Input
+                      value={couponInput}
+                      onChange={(e) => setCouponInput(e.target.value.toUpperCase())}
+                      onKeyDown={(e) => { if (e.key === 'Enter') void handleApplyCoupon(); }}
+                      placeholder="Enter code (e.g. SAVE20)"
+                      className="border-white/10 bg-white/5 text-white placeholder:text-gray-500 font-mono uppercase"
+                    />
+                    <Button
+                      variant="outline"
+                      className="border-purple-500/50 text-purple-400 hover:bg-purple-500/10 shrink-0"
+                      disabled={couponLoading || !couponInput.trim()}
+                      onClick={() => void handleApplyCoupon()}
+                    >
+                      {couponLoading ? '...' : 'Apply'}
+                    </Button>
+                  </div>
+                )}
+                {couponError && (
+                  <p className="mt-1.5 text-xs text-red-400">{couponError}</p>
+                )}
+              </Card>
+
+              {/* Order summary */}
+              <Card className="border-white/10 bg-gradient-to-br from-purple-500/10 to-blue-500/10 p-4 space-y-2">
                 <div className="flex items-center justify-between">
-                  <p className="font-medium text-white">Subtotal</p>
-                  <p className="text-xl font-bold text-white">{formatPrice(subtotal)}</p>
+                  <p className="text-sm text-gray-400">Subtotal</p>
+                  <p className="text-white">{formatPrice(subtotal)}</p>
+                </div>
+                {discountAmount > 0 && (
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm text-green-400">Discount ({appliedCoupon?.couponCode})</p>
+                    <p className="text-green-400">−{formatPrice(discountAmount)}</p>
+                  </div>
+                )}
+                <div className="border-t border-white/10 pt-2 flex items-center justify-between">
+                  <p className="font-semibold text-white">Total</p>
+                  <p className="text-xl font-bold text-white">{formatPrice(total)}</p>
                 </div>
               </Card>
 
@@ -265,7 +352,7 @@ export function Checkout() {
               disabled={submitting}
               onClick={() => void handlePlaceOrder()}
             >
-              {submitting ? 'Placing Order...' : `Place Order · ${formatPrice(subtotal)}`}
+              {submitting ? 'Placing Order...' : `Place Order · ${formatPrice(total)}`}
             </Button>
           </div>
         </div>

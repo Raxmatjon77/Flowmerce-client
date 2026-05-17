@@ -98,9 +98,7 @@ export function SupportThread() {
       if (!id) return;
       setUploading(true);
       try {
-        // Create an empty message first to get a messageId, then attach the file
-        const msg = await sendMessage(id, '');
-        await uploadAttachment(msg.id, file);
+        await uploadAttachment(id, file);
         reloadMessages();
         toast.success(`${file.name} uploaded.`);
       } catch (err) {
